@@ -33,7 +33,10 @@ class HawkAuthentication(BaseAuthentication):
         if not request.META.get('HTTP_AUTHORIZATION'):
             log.debug('request did not send an Authorization header')
             raise AuthenticationFailed('missing authorization header')
-
+        try:
+            use_cache_for_hawk_nonce = settings.USE_CACHE_FOR_HAWK_NONCE
+        except AttributeError:
+            use_cache_for_hawk_nonce = True  
         try:
             receiver = Receiver(
                 lookup_credentials,
@@ -41,7 +44,7 @@ class HawkAuthentication(BaseAuthentication):
                 request.build_absolute_uri(),
                 request.method,
                 content=request.body,
-                seen_nonce=(seen_nonce if settings.USE_CACHE_FOR_HAWK_NONCE
+                seen_nonce=(seen_nonce if use_cache_for_hawk_nonce
                             else None),
                 content_type=request.META.get('CONTENT_TYPE', ''),
                 timestamp_skew_in_seconds=settings.HAWK_MESSAGE_EXPIRATION)
@@ -51,6 +54,9 @@ class HawkAuthentication(BaseAuthentication):
             log.info('Hawk: denying access because of '
                      '{etype}: {val}'.format(etype=etype, val=val))
             raise AuthenticationFailed('authentication failed')
+        except Exception, inst:
+            print str(inst)
+            raise
 
         # Pass our receiver object to the middleware so the request header
         # doesn't need to be parsed again.
